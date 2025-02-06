@@ -80,7 +80,7 @@ func main() {
 	model.SetMaxOutputTokens(8192)
 	model.ResponseMIMEType = "application/json"
 	model.SystemInstruction = &genai.Content{
-		Parts: []genai.Part{genai.Text("You are a news filter who will be given a list of news headlines and their respective link where you will remove any headlines are are political in nature.  This include headlines that include political figures such as Elon Musk and individuals who are wealthy politicial donors.  ")},
+		Parts: []genai.Part{genai.Text("You are a news filter who will be given a list of news headlines and their respective link where you will remove any headlines that is about national politics or are political in nature.  Any headline that mentions Trump or United State politicians are considered political.  This include headlines that include individuals such as Elon Musk who are now considered to be political figures as well individuals who are wealthy politicial donors.  ")},
 	}
 	model.ResponseSchema = &genai.Schema{
 		Type: genai.TypeObject,
