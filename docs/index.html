@@ -7,7 +7,8 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>News Headlines</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+    <script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
     <style>
         body {
             font-family: 'Roboto', sans-serif;
@@ -21,7 +22,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 10px 20px;
-            background-color: #1976d2;
+            background-color: #3F51B5;
             color: white;
         }
         .settings-icon {
@@ -50,49 +51,42 @@
             color: #ffffff;
         }
         .headline {
-            margin: 20px;
+            margin: 10px;
             font-size: 18px;
             display: flex;
-            align-items: flex-start;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            min-height: 40px;
+        }
+        .dark-mode .headline {
+            background: #333;
+            color: #fff;
         }
         .bullet {
             margin-right: 10px;
-            color: #1976d2;
+            color: #3F51B5;
             font-size: 20px;
             line-height: 1.2;
         }
         a {
             text-decoration: none;
-            color: #1976d2;
+            color: #3F51B5;
         }
         a:hover {
             text-decoration: underline;
         }
-        @media screen and (max-width: 600px) {
-            .header {
-                flex-direction: column;
-                align-items: flex-start;
-                padding: 10px;
-            }
-            .settings-menu {
-                right: 10px;
-                top: 60px;
-                width: 150px;
-            }
-            .headline {
-                font-size: 16px;
-                margin: 10px;
-            }
-        }
     </style>
 </head>
 <body onclick="closeSettingsMenu(event)">
-    <div class="header">
+    <div class="header mdl-shadow--2dp">
         <h5>Latest News Headlines</h5>
         <span class="settings-icon" onclick="toggleSettingsMenu(event)">&#9881;</span>
     </div>
-    <div class="settings-menu" id="settings-menu">
-        <button class="btn blue" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    <div class="settings-menu mdl-card mdl-shadow--2dp" id="settings-menu">
+        <button class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored" onclick="toggleDarkMode()">Toggle Dark Mode</button>
     </div>
     <div id="news-container"></div>
 <script>
@@ -117,7 +111,7 @@
         .then(response => response.json())
         .then(newsData => {
             const newsContainer = document.getElementById("news-container");
-            newsData.forEach(headline => {  // No need to access a "headlines" key
+            newsData.forEach(headline => {
                 const headlineElement = document.createElement("div");
                 headlineElement.className = "headline";
                 headlineElement.innerHTML = `<span class="bullet">&#8226;</span><a href="${headline.link}" target="_blank">${headline.title}</a>`;
@@ -126,7 +120,6 @@
         })
         .catch(error => console.error('Error fetching headlines:', error));
 </script>
-
 </body>
 </html>
 
