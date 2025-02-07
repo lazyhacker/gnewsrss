@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"encoding/xml"
@@ -34,14 +35,33 @@ type Item struct {
 }
 
 func main() {
-	// URL of the RSS feed
-	feedURLs := []string{
-		"https://news.google.com/rss",
-		"https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US%3Aen", // World
-		"https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US%3Aen", // Business
-		"https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US%3Aen", // Technology
-		"https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNREpxYW5RU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US%3Aen", // Entertainment
-		"https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp1ZEdvU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US%3Aen", // Sports
+
+	// Open feeds file with the URLs of RSS feeds
+	ff, err := os.Open("feeds.txt")
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return
+	}
+	defer ff.Close() // Ensure file is closed
+
+	// Create a scanner to read the file line by line
+	var feedURLs []string
+	scanner := bufio.NewScanner(ff)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text()) // Trim spaces
+
+		// Ignore blank lines and lines starting with "#"
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		feedURLs = append(feedURLs, line) // Append valid lines
+	}
+
+	// Check for errors while reading
+	if err := scanner.Err(); err != nil {
+		panic(err)
 	}
 
 	var headlines, filteredHeadlines []Item
