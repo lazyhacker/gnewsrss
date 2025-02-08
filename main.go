@@ -17,7 +17,6 @@ import (
 )
 
 // RSS struct to parse RSS feed
-
 type RSS struct {
 	Channel Channel `xml:"channel"`
 }
