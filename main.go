@@ -17,16 +17,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-// RSS struct to parse RSS feed
-type RSS struct {
-	Channel Channel `xml:"channel"`
-}
-
-type Channel struct {
-	Title string `xml:"title"`
-	Items []Item `xml:"item"`
-}
-
 type Item struct {
 	Title string `xml:"title" json:"title"`
 	Link  string `xml:"link"  json:"link"`
@@ -34,11 +24,47 @@ type Item struct {
 
 func main() {
 
-	// Open feeds file with the URLs of RSS feeds
-	ff, err := os.Open("feeds.txt")
+	// Get the list of feeds to fetch.
+	feedUrls, err := FeedUrls("feeds.txt")
 	if err != nil {
-		fmt.Println("Error opening file:", err)
+		panic(err)
+	}
+
+	// Fetch the items from all the feeds.
+	headlines := FetchRSS(feedUrls)
+
+	// Filter out political items from the list.
+	filteredHeadlines, err := Filter(headlines)
+	if err != nil {
+		panic(err)
+	}
+
+	// Format the filtered list as JSON
+	jsonData, err := json.MarshalIndent(filteredHeadlines, " ", "    ")
+	if err != nil {
+		panic(err)
+	}
+
+	// Write the JSON to file.
+	log.Print("Writing to headlines.json")
+	f, err := os.Create(filepath.Join("docs", "headlines.json"))
+	if err != nil {
+		log.Print("Error creating or opening the file:", err)
 		return
+	}
+	defer f.Close()
+	if _, err := f.WriteString(string(jsonData)); err != nil {
+		panic(err)
+	}
+}
+
+// FeedUrls returns the list of RSS feed URLs from the configuration.
+func FeedUrls(feedsfile string) ([]string, error) {
+
+	// Open feeds file with the URLs of RSS feeds
+	ff, err := os.Open(feedsfile)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to open feeds file. %v.", err)
 	}
 	defer ff.Close() // Ensure file is closed
 
@@ -59,36 +85,18 @@ func main() {
 
 	// Check for errors while reading
 	if err := scanner.Err(); err != nil {
-		panic(err)
+		return nil, fmt.Errorf("Unable to read the feeds file. %v", err)
 	}
 
-	var headlines, filteredHeadlines []*gofeed.Item
+	return feedURLs, nil
+}
 
-	f, err := os.Create(filepath.Join("docs", "headlines.json"))
-	if err != nil {
-		log.Print("Error creating or opening the file:", err)
-		return
-	}
-	defer f.Close()
+// FetchRSS takes in a list of RSS feeds, fetches the items from the feeds
+// and return them in a single list.  It will remove items that are considered
+// old.
+func FetchRSS(feedURLs []string) []*gofeed.Item {
 
-	var prompt strings.Builder
-	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
-	if err != nil {
-		log.Fatalf("Error generating client. %v", err)
-
-	}
-	defer client.Close()
-
-	model := client.GenerativeModel("gemini-2.0-flash")
-	model.SetTemperature(1)
-	model.SetTopK(40)
-	model.SetTopP(0.95)
-	model.SetMaxOutputTokens(8192)
-	//model.ResponseMIMEType = "application/json"
-	model.SystemInstruction = &genai.Content{
-		Parts: []genai.Part{genai.Text("You are a news filter who will be given a list of news headlines prepended with an index value to filter out any that are political in nature.  Any headline that mentions Trump are considered political and should be removed.  Also filter out any headlines that include individuals such as Elon Musk who are political figures even though they aren't politicians. Also filter out individuals who are known wealthy politicial donors. Only return the index value of the headlines that are non-political as a comma separated list.")},
-	}
+	var headlines []*gofeed.Item
 
 	fp := gofeed.NewParser()
 	fp.UserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
@@ -137,8 +145,34 @@ func main() {
 		}
 	}
 
+	return headlines
+}
+
+func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, error) {
+
+	var filteredHeadlines []*gofeed.Item
+	var prompt strings.Builder
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
+	if err != nil {
+		return nil, fmt.Errorf("Error generating Gemini client. %v", err)
+
+	}
+	defer client.Close()
+
+	model := client.GenerativeModel("gemini-2.0-flash")
+	model.SetTemperature(1)
+	model.SetTopK(40)
+	model.SetTopP(0.95)
+	model.SetMaxOutputTokens(8192)
+	//model.ResponseMIMEType = "application/json"
+	model.SystemInstruction = &genai.Content{
+		Parts: []genai.Part{genai.Text("You are a news filter who will be given a list of news headlines prepended with an index value to filter out any that are political in nature.  Any headline that mentions Trump are considered political and should be removed.  Also filter out any headlines that include individuals such as Elon Musk who are political figures even though they aren't politicians. Also filter out individuals who are known wealthy politicial donors. Only return the index value of the headlines that are non-political as a comma separated list.")},
+	}
+
 	for idx, item := range headlines {
-		//fmt.Printf("%d %v\n", idx, item.Title)
+		fmt.Printf("%d %v\n", idx, item.Title)
 		prompt.WriteString(fmt.Sprintf("%d %v\n", idx, item.Title))
 	}
 
@@ -147,13 +181,12 @@ func main() {
 	chat := model.StartChat()
 	res, err := chat.SendMessage(ctx, genai.Text(prompt.String()))
 	if err != nil {
-		log.Fatalf("Error sending message: %v", err)
+		return nil, fmt.Errorf("Error sending message to Gemini. %v", err)
 	}
 
 	for _, part := range res.Candidates[0].Content.Parts {
-		//fmt.Printf("[%d]:\n%v\n", i, part)
 		partStr := fmt.Sprintf("%v", part)
-		//fmt.Printf("partStr = %v\n", partStr)
+		fmt.Printf("partStr = %v\n", partStr)
 		ss := strings.Split(partStr, ",")
 		for j := 0; j < len(ss); j++ {
 			x, err := strconv.Atoi(strings.TrimSpace(ss[j]))
@@ -166,16 +199,10 @@ func main() {
 				fmt.Printf("x = %d while len(headlines) = %d\n", x, len(headlines))
 				continue
 			}
+			fmt.Printf("headlines[%d] = %v\n", x, headlines[x].Title)
 			filteredHeadlines = append(filteredHeadlines, headlines[x])
 		}
 	}
 
-	jsonData, err := json.MarshalIndent(filteredHeadlines, " ", "    ")
-	if err != nil {
-		panic(err)
-	}
-	log.Print("Writing to headlines.json")
-	if _, err := f.WriteString(string(jsonData)); err != nil {
-		panic(err)
-	}
+	return filteredHeadlines, nil
 }
