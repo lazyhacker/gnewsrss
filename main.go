@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/mmcdole/gofeed"
@@ -90,6 +91,9 @@ func main() {
 	}
 
 	fp := gofeed.NewParser()
+	fp.UserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+	published_layout := "Mon, 02 Jan 2006 15:04:05 MST"
+	expiryDate := time.Now().AddDate(0, -1, 0) // 1 month ago
 
 	for _, u := range feedURLs {
 		// Fetch RSS feed
@@ -112,11 +116,23 @@ func main() {
 		*/
 		rss, err := fp.ParseURL(u)
 		if err != nil {
-			log.Fatalf("Error fetching feed: %v", err)
+			log.Printf("Error fetching feed %v: %v", u, err)
+			continue
 		}
 		// Print the titles and links of the latest articles
 		for _, item := range rss.Items {
 			//fmt.Printf("- %s (%s)\n", item.Title, item.Link)
+			pubDate, err := time.Parse(published_layout, item.Published)
+			if err == nil && pubDate.Before(expiryDate) {
+				//log.Println("published date greater then 1 month.  skipping...")
+				continue
+			}
+
+			if err != nil {
+				log.Printf("Unable to parse the published date. %v", err)
+			}
+
+			// if unable to parse date OR pubDate is less then one month, add to headline
 			headlines = append(headlines, item)
 		}
 	}
