@@ -172,7 +172,7 @@ func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, error) {
 	}
 
 	for idx, item := range headlines {
-		fmt.Printf("%d %v\n", idx, item.Title)
+		//fmt.Printf("%d %v\n", idx, item.Title)
 		prompt.WriteString(fmt.Sprintf("%d %v\n", idx, item.Title))
 	}
 
@@ -199,7 +199,7 @@ func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, error) {
 				fmt.Printf("x = %d while len(headlines) = %d\n", x, len(headlines))
 				continue
 			}
-			fmt.Printf("headlines[%d] = %v\n", x, headlines[x].Title)
+			//fmt.Printf("headlines[%d] = %v\n", x, headlines[x].Title)
 			filteredHeadlines = append(filteredHeadlines, headlines[x])
 		}
 	}
