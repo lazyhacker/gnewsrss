@@ -4,15 +4,17 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/mmcdole/gofeed"
 	"google.golang.org/api/option"
 )
 
@@ -61,7 +63,7 @@ func main() {
 		panic(err)
 	}
 
-	var headlines, filteredHeadlines []*gofeed.Item
+	var headlines, filteredHeadlines []Item
 
 	f, err := os.Create(filepath.Join("docs", "headlines.json"))
 	if err != nil {
@@ -89,33 +91,26 @@ func main() {
 		Parts: []genai.Part{genai.Text("You are a news filter who will be given a list of news headlines prepended with an index value to filter out any that are political in nature.  Any headline that mentions Trump are considered political and should be removed.  Also filter out any headlines that include individuals such as Elon Musk who are political figures even though they aren't politicians. Also filter out individuals who are known wealthy politicial donors. Only return the index value of the headlines that are non-political as a comma separated list.")},
 	}
 
-	fp := gofeed.NewParser()
-
 	for _, u := range feedURLs {
 		// Fetch RSS feed
-		/*
-			resp, err := http.Get(u)
-			if err != nil {
-				log.Fatalf("Error fetching RSS feed: %v", err)
-			}
-			defer resp.Body.Close()
-			// Read and parse RSS feed
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Fatalf("Error reading RSS feed: %v", err)
-			}
-
-			var rss RSS
-			if err := xml.Unmarshal(body, &rss); err != nil {
-				log.Fatalf("Error parsing RSS feed: %v", err)
-			}
-		*/
-		rss, err := fp.ParseURL(u)
+		resp, err := http.Get(u)
 		if err != nil {
-			log.Fatalf("Error fetching feed: %v", err)
+			log.Fatalf("Error fetching RSS feed: %v", err)
 		}
+		defer resp.Body.Close()
+		// Read and parse RSS feed
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalf("Error reading RSS feed: %v", err)
+		}
+
+		var rss RSS
+		if err := xml.Unmarshal(body, &rss); err != nil {
+			log.Fatalf("Error parsing RSS feed: %v", err)
+		}
+
 		// Print the titles and links of the latest articles
-		for _, item := range rss.Items {
+		for _, item := range rss.Channel.Items {
 			//fmt.Printf("- %s (%s)\n", item.Title, item.Link)
 			headlines = append(headlines, item)
 		}
