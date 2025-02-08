@@ -161,6 +161,11 @@ func main() {
 				log.Printf("Unable to convert to int: %v", err)
 				continue
 			}
+
+			if x >= len(headlines) {
+				fmt.Printf("x = %d while len(headlines) = %d\n", x, len(headlines))
+				continue
+			}
 			filteredHeadlines = append(filteredHeadlines, headlines[x])
 		}
 	}
