@@ -122,6 +122,7 @@ func main() {
 	}
 
 	for idx, item := range headlines {
+		fmt.Printf("%d %v\n", idx, item.Title)
 		prompt.WriteString(fmt.Sprintf("%d %v\n", idx, item.Title))
 	}
 
@@ -136,7 +137,7 @@ func main() {
 	for _, part := range res.Candidates[0].Content.Parts {
 		//fmt.Printf("[%d]:\n%v\n", i, part)
 		partStr := fmt.Sprintf("%v", part)
-		//fmt.Printf("partStr = %v\n", partStr)
+		fmt.Printf("partStr = %v\n", partStr)
 		ss := strings.Split(partStr, ",")
 		for j := 0; j < len(ss); j++ {
 			x, err := strconv.Atoi(strings.TrimSpace(ss[j]))

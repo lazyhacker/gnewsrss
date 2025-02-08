@@ -16,14 +16,26 @@
         padding: 0;
         background-color: #f4f4f4;
         color: #000;
+        overflow-x: hidden; /* Prevents horizontal scrolling */
     }
     .header {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        justify-content: space-between;  /* Ensures elements are on the same row */
+        align-items: flex-start;  /* Top aligns the items */
         padding: 10px 20px;
         background-color: #3F51B5;
         color: white;
+        position: relative;  /* Allows absolute positioning of the settings icon */
+        width: 100%;  /* Ensures header spans the entire width of the viewport */
+        box-sizing: border-box; /* Ensures padding does not cause overflow */
+    }
+    .header-left {
+        text-align: left;
+        flex-grow: 1;  /* Ensures the left side expands to take remaining space */
+    }
+    .header-right {
+        display: flex;
+        align-items: flex-start;  /* Aligns the settings icon to the top */
     }
     .settings-icon {
         cursor: pointer;
@@ -45,7 +57,7 @@
         color: #e0e0e0;  /* Lighter text color for better contrast */
     }
     .dark-mode a {
-        color: #4dccc6; /* Light turquise color */
+        color: #4dccc6; /* Light turquoise color */
     }
     .dark-mode a:hover {
         color: #ffffff;  /* Lighter hover color */
@@ -72,13 +84,23 @@
     a:hover {
         text-decoration: underline;
     }
+    .timestamp {
+        font-size: 12px;
+        margin-top: 5px;
+        color: #e0e0e0;
+    }
 </style>
 
 </head>
 <body onclick="closeSettingsMenu(event)">
     <div class="header mdl-shadow--2dp">
-        <h5>Latest News Headlines</h5>
-        <span class="settings-icon" onclick="toggleSettingsMenu(event)">&#9881;</span>
+        <div class="header-left">
+            <h5>Latest News Headlines</h5>
+            <div id="timestamp" class="timestamp"></div>
+        </div>
+        <div class="header-right">
+            <span class="settings-icon" onclick="toggleSettingsMenu(event)">&#9881;</span>
+        </div>
     </div>
     <div class="settings-menu mdl-card mdl-shadow--2dp" id="settings-menu">
         <button class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored" onclick="toggleDarkMode()">Toggle Dark Mode</button>
@@ -117,8 +139,14 @@
         }
     }
 
-    // Call the checkDarkMode function when the page loads to apply the saved mode
-    window.onload = checkDarkMode;
+    // Fetch the file and display its last modified date
+    fetch('headlines.txt')
+        .then(response => {
+            const lastModified = new Date(response.headers.get('last-modified'));
+            const timestampElement = document.getElementById('timestamp');
+            timestampElement.textContent = `Last Modified: ${lastModified.toLocaleString()}`;
+        })
+        .catch(error => console.error('Error fetching the file:', error));
 
     fetch('headlines.json')
         .then(response => response.json())
@@ -132,8 +160,10 @@
             });
         })
         .catch(error => console.error('Error fetching headlines:', error));
-</script>
 
+    window.onload = checkDarkMode;
+    </script>
 </body>
+
 </html>
 
