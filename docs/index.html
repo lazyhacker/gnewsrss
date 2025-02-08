@@ -139,27 +139,28 @@
         }
     }
 
-    // Fetch the file and display its last modified date
-    fetch('headlines.txt')
-        .then(response => {
-            const lastModified = new Date(response.headers.get('last-modified'));
-            const timestampElement = document.getElementById('timestamp');
-            timestampElement.textContent = `Last Modified: ${lastModified.toLocaleString()}`;
-        })
-        .catch(error => console.error('Error fetching the file:', error));
-
+    // Fetch the file, display its last modified date, and return the headlines.
     fetch('headlines.json')
-        .then(response => response.json())
-        .then(newsData => {
-            const newsContainer = document.getElementById("news-container");
-            newsData.forEach(headline => {
-                const headlineElement = document.createElement("div");
-                headlineElement.className = "headline";
-                headlineElement.innerHTML = `<a href="${headline.link}" target="_blank">${headline.title}</a>`;
-                newsContainer.appendChild(headlineElement);
-            });
-        })
-        .catch(error => console.error('Error fetching headlines:', error));
+    .then(response => {
+        // Get the Last-Modified date from the headers
+        const lastModified = new Date(response.headers.get('last-modified'));
+        const timestampElement = document.getElementById('timestamp');
+        timestampElement.textContent = `Last Modified: ${lastModified.toLocaleString()}`;
+
+        // Return the JSON content of the file
+        return response.json();
+    })
+    .then(newsData => {
+        // Handle the JSON content and append the headlines to the page
+        const newsContainer = document.getElementById("news-container");
+        newsData.forEach(headline => {
+            const headlineElement = document.createElement("div");
+            headlineElement.className = "headline";
+            headlineElement.innerHTML = `<a href="${headline.link}" target="_blank">${headline.title}</a>`;
+            newsContainer.appendChild(headlineElement);
+        });
+    })
+    .catch(error => console.error('Error fetching the file or headlines:', error));
 
     window.onload = checkDarkMode;
     </script>
