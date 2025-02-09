@@ -175,7 +175,14 @@ func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, []*gofeed.Item, error) {
 	}
 	defer client.Close()
 
-	instruction, err := ioutil.ReadFile(instrf)
+	filter_instruction, err := ioutil.ReadFile(instrf)
+
+	instruction := strings.Join([]string{
+		"You are a news filter who will be given a list of news headlines prepended with an index value.",
+		string(filter_instruction),
+		"Only return the index value of the headlines as a comma separated list.",
+	}, "\n")
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("Unable to read instruction file. %v", err)
 	}
