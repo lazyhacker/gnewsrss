@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -18,8 +19,9 @@ import (
 )
 
 var (
-	debug bool
-	model string
+	debug  bool
+	model  string
+	instrf string
 )
 
 func main() {
@@ -27,6 +29,7 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "Enable debug mode.")
 	flag.StringVar(&model, "model", "gemini-2.0-flash", "Gemini model")
 	feedsConfig := flag.String("feeds", "feeds.txt", "File containing feed URLs to fetch.")
+	flag.StringVar(&instrf, "instruction", "instruction.txt", "Path to file containing the filter instructions.")
 	outfile := flag.String("out", "", "Output file")
 	flag.Parse()
 
@@ -172,13 +175,17 @@ func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, []*gofeed.Item, error) {
 	}
 	defer client.Close()
 
+	instruction, err := ioutil.ReadFile(instrf)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Unable to read instruction file. %v", err)
+	}
 	model := client.GenerativeModel(model)
 	model.SetTemperature(1)
 	model.SetTopK(40)
 	model.SetTopP(0.95)
 	model.SetMaxOutputTokens(8192) // More then sufficient when returning just the index.
 	model.SystemInstruction = &genai.Content{
-		Parts: []genai.Part{genai.Text("You are a news filter who will be given a list of news headlines prepended with an index value to filter out any that are political in nature.  Any headline that mentions Trump are considered political and should be removed.  Also filter out any headlines that include individuals such as Elon Musk who are political figures even though they aren't politicians. Also filter out individuals who are known wealthy politicial donors. Only return the index value of the headlines that are non-political as a comma separated list.")},
+		Parts: []genai.Part{genai.Text(instruction)},
 	}
 
 	for idx, item := range headlines {
