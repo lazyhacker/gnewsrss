@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -22,7 +23,12 @@ type Item struct {
 	Link  string `xml:"link"  json:"link"`
 }
 
+var debug bool
+
 func main() {
+
+	flag.BoolVar(&debug, "debug", false, "Enable debug mode.")
+	flag.Parse()
 
 	// Get the list of feeds to fetch.
 	feedUrls, err := FeedUrls("feeds.txt")
@@ -34,27 +40,43 @@ func main() {
 	headlines := FetchRSS(feedUrls)
 
 	// Filter out political items from the list.
-	filteredHeadlines, err := Filter(headlines)
+	filteredHeadlines, discardedHeadlines, err := Filter(headlines)
 	if err != nil {
 		panic(err)
 	}
 
-	// Format the filtered list as JSON
-	jsonData, err := json.MarshalIndent(filteredHeadlines, " ", "    ")
-	if err != nil {
-		panic(err)
+	if debug {
+		log.Println("All Headlines\n")
+		for i, v := range headlines {
+			log.Printf("%d %v\n", i, v.Title)
+		}
+		log.Println("\n********Accepted Headlines**********\n")
+		for _, v := range filteredHeadlines {
+			log.Printf("%v\n", v.Title)
+		}
+		log.Println("\n**************Dropped Headlines***********\n")
+		for _, v := range discardedHeadlines {
+			log.Printf("%v\n", v.Title)
+		}
 	}
+	if !debug {
+		// Format the filtered list as JSON
+		jsonData, err := json.MarshalIndent(filteredHeadlines, " ", "    ")
+		if err != nil {
+			panic(err)
+		}
 
-	// Write the JSON to file.
-	log.Print("Writing to headlines.json")
-	f, err := os.Create(filepath.Join("docs", "headlines.json"))
-	if err != nil {
-		log.Print("Error creating or opening the file:", err)
-		return
-	}
-	defer f.Close()
-	if _, err := f.WriteString(string(jsonData)); err != nil {
-		panic(err)
+		// Write the JSON to file.
+		log.Print("Writing to headlines.json")
+		f, err := os.Create(filepath.Join("docs", "headlines.json"))
+		if err != nil {
+			log.Print("Error creating or opening the file:", err)
+			return
+		}
+		defer f.Close()
+		if _, err := f.WriteString(string(jsonData)); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -148,15 +170,15 @@ func FetchRSS(feedURLs []string) []*gofeed.Item {
 	return headlines
 }
 
-func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, error) {
+func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, []*gofeed.Item, error) {
 
-	var filteredHeadlines []*gofeed.Item
+	var filteredHeadlines, discardedHeadlines []*gofeed.Item
 	var prompt strings.Builder
 
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
 	if err != nil {
-		return nil, fmt.Errorf("Error generating Gemini client. %v", err)
+		return nil, nil, fmt.Errorf("Error generating Gemini client. %v", err)
 
 	}
 	defer client.Close()
@@ -181,13 +203,16 @@ func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, error) {
 	chat := model.StartChat()
 	res, err := chat.SendMessage(ctx, genai.Text(prompt.String()))
 	if err != nil {
-		return nil, fmt.Errorf("Error sending message to Gemini. %v", err)
+		return nil, nil, fmt.Errorf("Error sending message to Gemini. %v", err)
 	}
 
 	for _, part := range res.Candidates[0].Content.Parts {
 		partStr := fmt.Sprintf("%v", part)
-		fmt.Printf("partStr = %v\n", partStr)
+		if debug {
+			log.Printf("accepted headlines = %v\n", partStr)
+		}
 		ss := strings.Split(partStr, ",")
+		dropCounter := -1
 		for j := 0; j < len(ss); j++ {
 			x, err := strconv.Atoi(strings.TrimSpace(ss[j]))
 			if err != nil {
@@ -196,13 +221,43 @@ func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, error) {
 			}
 
 			if x >= len(headlines) {
-				fmt.Printf("x = %d while len(headlines) = %d\n", x, len(headlines))
+				log.Printf("x = %d while len(headlines) = %d\n", x, len(headlines))
 				continue
 			}
 			//fmt.Printf("headlines[%d] = %v\n", x, headlines[x].Title)
 			filteredHeadlines = append(filteredHeadlines, headlines[x])
+
+			// The LLM returns the the sequence of headlines indices for headlines
+			// to the kept so the gap between the returned numbers are the
+			// headlines that were filtered out
+			for _, y := range gap(dropCounter, x) {
+				discardedHeadlines = append(discardedHeadlines, headlines[y])
+			}
+			dropCounter = x // remember so can find the gap with the next index
+		}
+
+		// Do one more check to see if there is a gap between the last
+		// accepted headline to the end of the original headlines.
+		for _, y := range gap(dropCounter, len(headlines)-1) {
+			discardedHeadlines = append(discardedHeadlines, headlines[y])
 		}
 	}
 
-	return filteredHeadlines, nil
+	return filteredHeadlines, discardedHeadlines, nil
+}
+
+// gap returns the missing numbers between two given integers.
+func gap(a, b int) []int {
+
+	var intgap []int
+
+	g := b - a - 1
+	if g <= 0 {
+		return nil
+	}
+
+	for i := a + 1; i <= a+g; i++ {
+		intgap = append(intgap, i)
+	}
+	return intgap
 }
