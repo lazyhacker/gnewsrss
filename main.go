@@ -23,11 +23,15 @@ type Item struct {
 	Link  string `xml:"link"  json:"link"`
 }
 
-var debug bool
+var (
+	debug bool
+	model string
+)
 
 func main() {
 
 	flag.BoolVar(&debug, "debug", false, "Enable debug mode.")
+	flag.StringVar(&model, "model", "gemini-2.0-flash", "Gemini model")
 	feedsConfig := flag.String("feeds", "feeds.txt", "File containing feed URLs to fetch.")
 	flag.Parse()
 
@@ -60,6 +64,7 @@ func main() {
 			fmt.Printf("%v\n", v.Title)
 		}
 	}
+
 	if !debug {
 		// Format the filtered list as JSON
 		jsonData, err := json.MarshalIndent(filteredHeadlines, " ", "    ")
@@ -128,23 +133,6 @@ func FetchRSS(feedURLs []string) []*gofeed.Item {
 
 	for _, u := range feedURLs {
 		// Fetch RSS feed
-		/*
-			resp, err := http.Get(u)
-			if err != nil {
-				log.Fatalf("Error fetching RSS feed: %v", err)
-			}
-			defer resp.Body.Close()
-			// Read and parse RSS feed
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Fatalf("Error reading RSS feed: %v", err)
-			}
-
-			var rss RSS
-			if err := xml.Unmarshal(body, &rss); err != nil {
-				log.Fatalf("Error parsing RSS feed: %v", err)
-			}
-		*/
 		rss, err := fp.ParseURL(u)
 		if err != nil {
 			log.Printf("Error fetching feed %v: %v", u, err)
@@ -152,25 +140,27 @@ func FetchRSS(feedURLs []string) []*gofeed.Item {
 		}
 		// Print the titles and links of the latest articles
 		for _, item := range rss.Items {
-			//fmt.Printf("- %s (%s)\n", item.Title, item.Link)
+
 			pubDate, err := time.Parse(published_layout, item.Published)
+
+			// Don't keep items that are older then expirayDate old.
 			if err == nil && pubDate.Before(expiryDate) {
-				//log.Println("published date greater then 1 month.  skipping...")
 				continue
 			}
 
+			// If unable to parse the date then just keep the item.  Logging
+			// just to see how often this happens.
 			if err != nil {
 				log.Printf("Unable to parse the published date. %v", err)
 			}
 
-			// if unable to parse date OR pubDate is less then one month, add to headline
 			headlines = append(headlines, item)
 		}
 	}
-
 	return headlines
 }
 
+// Filter calls Gemini API to have it filter the items.
 func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, []*gofeed.Item, error) {
 
 	var filteredHeadlines, discardedHeadlines []*gofeed.Item
@@ -184,23 +174,20 @@ func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, []*gofeed.Item, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-2.0-flash")
+	model := client.GenerativeModel(model)
 	model.SetTemperature(1)
 	model.SetTopK(40)
 	model.SetTopP(0.95)
-	model.SetMaxOutputTokens(8192)
-	//model.ResponseMIMEType = "application/json"
+	model.SetMaxOutputTokens(8192) // More then sufficient when returning just the index.
 	model.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{genai.Text("You are a news filter who will be given a list of news headlines prepended with an index value to filter out any that are political in nature.  Any headline that mentions Trump are considered political and should be removed.  Also filter out any headlines that include individuals such as Elon Musk who are political figures even though they aren't politicians. Also filter out individuals who are known wealthy politicial donors. Only return the index value of the headlines that are non-political as a comma separated list.")},
 	}
 
 	for idx, item := range headlines {
-		//fmt.Printf("%d %v\n", idx, item.Title)
 		prompt.WriteString(fmt.Sprintf("%d %v\n", idx, item.Title))
 	}
 
 	log.Println("------------Calling Gemini--------------")
-	//fmt.Printf("Prompt:\n%s", prompt.String())
 	chat := model.StartChat()
 	res, err := chat.SendMessage(ctx, genai.Text(prompt.String()))
 	if err != nil {
@@ -225,7 +212,6 @@ func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, []*gofeed.Item, error) {
 				log.Printf("x = %d while len(headlines) = %d\n", x, len(headlines))
 				continue
 			}
-			//fmt.Printf("headlines[%d] = %v\n", x, headlines[x].Title)
 			filteredHeadlines = append(filteredHeadlines, headlines[x])
 
 			// The LLM returns the the sequence of headlines indices for headlines
