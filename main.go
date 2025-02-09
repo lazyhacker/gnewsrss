@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -17,11 +16,6 @@ import (
 	"github.com/mmcdole/gofeed"
 	"google.golang.org/api/option"
 )
-
-type Item struct {
-	Title string `xml:"title" json:"title"`
-	Link  string `xml:"link"  json:"link"`
-}
 
 var (
 	debug bool
@@ -33,6 +27,7 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "Enable debug mode.")
 	flag.StringVar(&model, "model", "gemini-2.0-flash", "Gemini model")
 	feedsConfig := flag.String("feeds", "feeds.txt", "File containing feed URLs to fetch.")
+	outfile := flag.String("out", "", "Output file")
 	flag.Parse()
 
 	// Get the list of feeds to fetch.
@@ -65,16 +60,16 @@ func main() {
 		}
 	}
 
-	if !debug {
-		// Format the filtered list as JSON
-		jsonData, err := json.MarshalIndent(filteredHeadlines, " ", "    ")
-		if err != nil {
-			panic(err)
-		}
+	// Format the filtered list as JSON
+	jsonData, err := json.MarshalIndent(filteredHeadlines, " ", "    ")
+	if err != nil {
+		panic(err)
+	}
 
+	if len(*outfile) > 0 {
 		// Write the JSON to file.
 		log.Print("Writing to headlines.json")
-		f, err := os.Create(filepath.Join("docs", "headlines.json"))
+		f, err := os.Create(*outfile)
 		if err != nil {
 			log.Print("Error creating or opening the file:", err)
 			return
@@ -83,7 +78,10 @@ func main() {
 		if _, err := f.WriteString(string(jsonData)); err != nil {
 			panic(err)
 		}
+	} else {
+		fmt.Printf("%v\n", string(jsonData))
 	}
+
 }
 
 // FeedUrls returns the list of RSS feed URLs from the configuration.
