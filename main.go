@@ -71,7 +71,7 @@ func main() {
 
 	if len(*outfile) > 0 {
 		// Write the JSON to file.
-		log.Print("Writing to headlines.json")
+		log.Printf("Writing to %v\n", *outfile)
 		f, err := os.Create(*outfile)
 		if err != nil {
 			log.Print("Error creating or opening the file:", err)
