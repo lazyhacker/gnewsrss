@@ -28,10 +28,11 @@ var debug bool
 func main() {
 
 	flag.BoolVar(&debug, "debug", false, "Enable debug mode.")
+	feedsConfig := flag.String("feeds", "feeds.txt", "File containing feed URLs to fetch.")
 	flag.Parse()
 
 	// Get the list of feeds to fetch.
-	feedUrls, err := FeedUrls("feeds.txt")
+	feedUrls, err := FeedUrls(*feedsConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -46,17 +47,17 @@ func main() {
 	}
 
 	if debug {
-		log.Println("All Headlines\n")
+		fmt.Println("All Headlines\n")
 		for i, v := range headlines {
-			log.Printf("%d %v\n", i, v.Title)
+			fmt.Printf("%d %v\n", i, v.Title)
 		}
-		log.Println("\n********Accepted Headlines**********\n")
+		fmt.Println("\n********Accepted Headlines**********\n")
 		for _, v := range filteredHeadlines {
-			log.Printf("%v\n", v.Title)
+			fmt.Printf("%v\n", v.Title)
 		}
-		log.Println("\n**************Dropped Headlines***********\n")
+		fmt.Println("\n**************Dropped Headlines***********\n")
 		for _, v := range discardedHeadlines {
-			log.Printf("%v\n", v.Title)
+			fmt.Printf("%v\n", v.Title)
 		}
 	}
 	if !debug {
@@ -209,7 +210,7 @@ func Filter(headlines []*gofeed.Item) ([]*gofeed.Item, []*gofeed.Item, error) {
 	for _, part := range res.Candidates[0].Content.Parts {
 		partStr := fmt.Sprintf("%v", part)
 		if debug {
-			log.Printf("accepted headlines = %v\n", partStr)
+			fmt.Printf("accepted headlines = %v\n", partStr)
 		}
 		ss := strings.Split(partStr, ",")
 		dropCounter := -1
